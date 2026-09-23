@@ -1,0 +1,10 @@
+# Module 05 class-project: shipment-performance ETL.
+# Pinned to the curriculum versions so the pipeline behaves identically on
+# the host (make run) and inside the docker container.
+
+pandas==2.2.2
+numpy==1.26.4
+sqlalchemy==2.0.30
+psycopg2-binary==2.9.9
+python-dotenv==1.0.1
+pytest==8.2.0

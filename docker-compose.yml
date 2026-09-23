@@ -1,0 +1,49 @@
+# Two services. etl runs the pipeline once and exits zero on success; smoke
+# waits for etl to finish, reads the etl_status.json the pipeline wrote to
+# the shared data volume, and asserts rows_written > 0 AND idempotent=true.
+# The smoke fails non-zero if either assertion breaks, which fails the
+# whole compose run.
+
+services:
+  etl:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: shipment-etl:demo
+    container_name: shipment-etl
+    environment:
+      DB_URL: ${DB_URL:?DB_URL must be set; copy .env.example to .env and fill in}
+      LEARNER_SCHEMA: ${LEARNER_SCHEMA:-my_work}
+    volumes:
+      - etl-data:/app/data
+
+  smoke:
+    image: python:3.12-slim
+    container_name: shipment-etl-smoke
+    depends_on:
+      etl:
+        condition: service_completed_successfully
+    volumes:
+      - etl-data:/app/data:ro
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        echo '=== etl_status.json (full) ============================='
+        cat /app/data/etl_status.json
+        echo
+        echo '=== assertions ========================================='
+        python -c "
+        import json, sys
+        s = json.load(open('/app/data/etl_status.json'))
+        assert s['written'] > 0, f'expected written > 0, got {s[\"written\"]}'
+        assert s['idempotent'] is True, f'expected idempotent=true, got {s[\"idempotent\"]}'
+        assert s['rows_after_first_load'] == s['rows_after_second_load'], 'second load changed row count'
+        print(f'rows_in={s[\"rows_in\"]}  quarantined={s[\"quarantined\"]}  written={s[\"written\"]}')
+        print(f'idempotency: {s[\"rows_after_first_load\"]} == {s[\"rows_after_second_load\"]}')
+        "
+        echo SMOKE-OK
+
+volumes:
+  etl-data:

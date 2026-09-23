@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+data/quarantine.csv
+data/etl_status.json
+
